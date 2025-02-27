@@ -26,6 +26,7 @@ function helpPanel (){
   echo -e "\t${purpleColour}u)${endColour}${grayColour} Descargar o actualizar archivos necesarios${endColour}"
   echo -e "\t${purpleColour}m)${endColour}${grayColour} Buscar por un nombre de máquina${endColour}"
   echo -e "\t${purpleColour}i)${endColour}${grayColour} Buscar por dirección IP${endColour}"
+  echo -e "\t${purpleColour}y)${endColour}${grayColour} Obtener Link de la resolucion de la máquina en youtube${endColour}"
   echo -e "\t${purpleColour}h)${endColour}${grayColour} Mostrar este panel de ayuda${endColour}\n"
 }
 
@@ -64,28 +65,45 @@ function updateFiles(){
 
 function searchMachine(){
   machineName="$1"
+  
+  machineName_checker="$(cat bundle.js | awk "/name: \"$machineName\"/,/resuelta:/" | grep -vE "id:|sku:|resuelta" | tr -d '"' | tr -d ',' | sed 's/^ *//')"
+  
+  if [ "$machineName_checker" ]; then
 
-  echo -e "\n${yellowColour}[+]${endColour}${grayColour} Listando las propiedades de la máquina${endColour}${turquoiseColour} $machineName${endColour}${grayColour}:${endColour}\n"
+    echo -e "\n${yellowColour}[+]${endColour}${grayColour} Listando las propiedades de la máquina${endColour}${turquoiseColour} $machineName${endColour}${grayColour}:${endColour}\n"
 
-  cat bundle.js | grep -i "name: \"$machineName\"" -A 10 | awk "/name: /,/resuelta:/" | grep -vE "id:|sku:|resuelta:|activeDirectory:" | sed 's/^ *//' | sed 's/name:/Nombre:/' | sed 's/ip:/IP:/' | sed 's/dificultad:/Dificultad:/' | sed 's/skills:/Tecnicas:/' | sed 's/like:/Certificaciones:/' | sed 's/youtube:/Link:/' | sed 's/so:/OS:/'| tr -d '"' | tr -d ',' | while read line; do echo -en ${yellowColour}$(echo $line | awk '{print $1}')${endColour}; echo -e ${turquoiseColour} $(echo $line | awk '{for(i=2; i <= NF; i++) print $i}')${endColour}; done
+    cat bundle.js | grep -i "name: \"$machineName\"" -A 10 | awk "/name: /,/resuelta:/" | grep -vE "id:|sku:|resuelta:|activeDirectory:" | sed 's/^ *//' | sed 's/name:/Nombre:/' | sed 's/ip:/IP:/' | sed 's/dificultad:/Dificultad:/' | sed 's/skills:/Tecnicas:/' | sed 's/like:/Certificaciones:/' | sed 's/youtube:/Link:/' | sed 's/so:/OS:/'| tr -d '"' | tr -d ',' | while read line; do echo -en ${yellowColour}$(echo $line | awk '{print $1}')${endColour}; echo -e ${turquoiseColour} $(echo $line | awk '{for(i=2; i <= NF; i++) print $i}')${endColour}; done 
+  else 
+    echo -e "\n${redColour}[!] La máquina proporcionada no existe${endColour}\n"
+  fi 
 }
 
 function searchIP(){
   ipAddress="$1"
 
   machineName="$(cat bundle.js | grep "ip: \"$ipAddress\"" -B 3 | grep "name: " | awk 'NF{print $NF}' | tr -d '"' | tr -d ',')"
+  
+  if [ "$machineName" ]; then
+    echo -e "\n${yellowColour}[+]${endColour}${grayColour} La máquina correspondiente para la IP${endColour}${turquoiseColour} $ipAddress${endColour}${grayColour} es${endColour} ${turquoiseColour}$machineName${endColour}\n"
+  else 
+    echo -e "\n${redColour}[!] La dirección IP proporcionada no existe${endColour}\n"
+  fi 
+}
 
-  echo -e "\n${yellowColour}[+]${endColour}${grayColour} La máquina correspondiente para la IP${endColour}${turquoiseColour} $ipAddress${endColour}${grayColour} es${endColour} ${turquoiseColour}$machineName${endColour}\n"
+function getYoutubelink(){
+
+  echo "Obtener enlace de youtube"
 }
 
 # Indicadires
 declare -i parameter_counter=0 
 
-while getopts "m:ui:h" arg; do 
+while getopts "m:ui:y:h" arg; do 
   case $arg in 
-    m) machineName=$OPTARG; let parameter_counter+=1;;
+    m) machineName="$OPTARG"; let parameter_counter+=1;;
     u) let parameter_counter+=2;;
-    i) ipAddress=$OPTARG; let parameter_counter+=3;;
+    i) ipAddress="$OPTARG"; let parameter_counter+=3;;
+    y) machineName="$OPTARG"; let parameter_counter+=4;;
     h) ;;
   esac
 done
@@ -96,6 +114,8 @@ elif [ $parameter_counter -eq 2 ]; then
   updateFiles
 elif [ $parameter_counter -eq 3 ]; then
   searchIP $ipAddress
+elif [ $parameter_counter -eq 4 ]; then
+  getYoutubelink $machineName
 else 
   helpPanel
 fi 
