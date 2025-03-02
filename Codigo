@@ -117,6 +117,20 @@ function getMachinesDifficulty(){
   fi 
 }
 
+function getOSMachines(){
+  os="$1"
+
+  os_results="$(cat bundle.js | grep "so: \"$os\"" -B 5 | grep "name: " | awk 'NF{print $NF}' | tr -d '"' | tr -d ',' | column )"
+
+  if [ "$os_results" ]; then
+    echo -e "\n${yellowColour}[+]${endColour} Mostrando las máquinas cuyo sistema operativo es ${endColour}${turquoiseColour}$os${endColour}\n"
+
+    cat bundle.js | grep "so: \"$os\"" -B 5 | grep "name: " | awk 'NF{print $NF}' | tr -d '"' | tr -d ',' | column 
+  else 
+    echo -e "\n${redColour}[!] El sistema operativo no existe${endColour}\n"
+  fi
+}
+
 # Indicadires
 declare -i parameter_counter=0 
 
