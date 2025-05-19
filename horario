@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+
+num_camareros = 12
+num_cocineros = 10
+dias_semana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+
+# Definir los posibles turnos con sus horas de inicio y fin
+turnos_posibles_camareros = [
+    {"nombre": "Desayuno", "inicio": 8, "fin": 12},
+    {"nombre": "Pre-Almuerzo", "inicio": 11, "fin": 15},
+    {"nombre": "Almuerzo", "inicio": 12, "fin": 16},
+    {"nombre": "Tarde", "inicio": 15, "fin": 19},
+    {"nombre": "Pre-Cena", "inicio": 18, "fin": 22},
+    {"nombre": "Cena", "inicio": 19, "fin": 23},
+    {"nombre": "Cierre", "inicio": 22, "fin": 2}, # Ejemplo de turno que cruza la medianoche
+]
+
+turnos_posibles_cocineros = [
+    {"nombre": "Preparación Mañana", "inicio": 7, "fin": 11},
+    {"nombre": "Cocina Mañana", "inicio": 10, "fin": 14},
+    {"nombre": "Cocina Mediodía", "inicio": 12, "fin": 17},
+    {"nombre": "Preparación Tarde", "inicio": 16, "fin": 20},
+    {"nombre": "Cocina Tarde/Noche", "inicio": 18, "fin": 23},
+    {"nombre": "Cierre Cocina", "inicio": 22, "fin": 1}, # Ejemplo de turno que cruza la medianoche
+]
+
+# Definir la cobertura mínima requerida por intervalo de tiempo
+# Ahora la cobertura se define por franjas horarias
+cobertura_camareros_horaria = {
+    "Lunes": {
+        (8, 12): 2, (11, 15): 3, (12, 16): 4, (15, 19): 3, (18, 22): 4, (19, 23): 5, (22, 2): 2
+    },
+    "Martes": {
+        (8, 12): 2, (11, 15): 3, (12, 16): 4, (15, 19): 3, (18, 22): 4, (19, 23): 5, (22, 2): 2
+    },
+    # ... (definir para todos los días)
+}
+
+cobertura_cocineros_horaria = {
+    "Lunes": {
+        (7, 11): 1, (10, 14): 2, (12, 17): 3, (16, 20): 2, (18, 23): 4, (22, 1): 2
+    },
+    "Martes": {
+        (7, 11): 1, (10, 14): 2, (12, 17): 3, (16, 20): 2, (18, 23): 4, (22, 1): 2
+    },
+    # ... (definir para todos los días)
+}
+
+# Restricciones para el personal
+max_horas_semanales = 40
+min_descanso_entre_turnos = 12  # Horas
+dias_libres_semana = 2
+
+personal_camareros = [f"Camarero {i+1}" for i in range(num_camareros)]
+personal_cocineros = [f"Cocinero {i+1}" for i in range(num_cocineros)]
+
+horario_camareros = {dia: [] for dia in dias_semana}
+horario_cocineros = {dia: [] for dia in dias_semana}
+
+import random
+
+def generar_horario_flexible(personal, turnos_posibles, cobertura_horaria, dias, max_horas, min_descanso, dias_libres):
+    horario = {dia: [] for dia in dias}
+    asignaciones_semanales_horas = {empleado: 0 for empleado in personal}
+    asignaciones_semanales_turnos = {empleado: [] for empleado in personal}
+    dias_libres_asignados = {empleado: 0 for empleado in personal}
+    ultimo_turno = {empleado: None for empleado in personal}
+    fin_ultimo_turno = {empleado: None for empleado in personal}
+
+    # 1. Intentar cubrir la demanda horaria
+    for dia in dias:
+        cobertura_dia = cobertura_horaria[dia]
+        intervalos_cubiertos = {intervalo: 0 for intervalo in cobertura_dia}
+
+        # Iterar hasta que se cumpla la cobertura para todos los intervalos del día
+        while not all(intervalos_cubiertos[intervalo] >= cobertura_dia[intervalo] for intervalo in cobertura_dia):
+            empleados_disponibles = [
+                emp for emp in personal
+                if asignaciones_semanales_horas[emp] < max_horas and
+                   dias_libres_asignados[emp] < dias_libres and
+                   (ultimo_turno[emp] is None or
+                    (dias.index(dia) > dias.index(ultimo_turno[emp]) or
+                     (dias.index(dia) == dias.index(ultimo_turno[emp]) and fin_ultimo_turno[emp] <= min(cobertura_dia.keys(), key=lambda x: x[0])[0]) or # Si es el mismo día, el nuevo turno debe empezar después del descanso
+                     (dias.index(dia) == dias.index(ultimo_turno[emp]) + 1 and
+                      (min(cobertura_dia.keys(), key=lambda x: x[0])[0] * 1) - fin_ultimo_turno[emp] >= min_descanso))) # Al día siguiente, inicio debe ser después del descanso
+            ]
+
+            if not empleados_disponibles:
+                print(f"Advertencia: No se pudo cubrir completamente la demanda para {dia}")
+                break
+
+            # Seleccionar un empleado y un turno que ayude a cubrir la demanda
+            empleado_seleccionado = random.choice(empleados_disponibles)
+            turno_seleccionado = random.choice(turnos_posibles) # Aquí se podría implementar una lógica más inteligente para elegir el turno
+
+            # Verificar si el turno seleccionado ayuda a cubrir algún intervalo
+            cubrio_intervalo = False
+            for intervalo in cobertura_dia:
+                inicio_int, fin_int = intervalo
+                if intervalos_cubiertos[intervalo] < cobertura_dia[intervalo] and \
+                   max(turno_seleccionado["inicio"], inicio_int) < min(turno_seleccionado["fin"], fin_int):
+                    horario[dia].append({"empleado": empleado_seleccionado, "turno": turno_seleccionado})
+                    asignaciones_semanales_horas[empleado_seleccionado] += (turno_seleccionado["fin"] - turno_seleccionado["inicio"])
+                    asignaciones_semanales_turnos[empleado_seleccionado].append((dia, turno_seleccionado))
+                    ultimo_turno[empleado_seleccionado] = dia
+                    fin_ultimo_turno[empleado_seleccionado] = turno_seleccionado["fin"]
+                    intervalos_cubiertos[intervalo] += 1
+                    cubrio_intervalo = True
+                    break
+
+            if not cubrio_intervalo:
+                # Si el turno no cubre ningún intervalo necesario, intentar con otro empleado/turno
+                continue
+
+    # 2. Asignar días libres (similar al anterior, necesita mejora)
+    for empleado in personal:
+        asignaciones = asignaciones_semanales_turnos[empleado]
+        dias_trabajados = set([dia for dia, turno in asignaciones])
+        dias_posibles_libres = [dia for dia in dias if dia not in dias_trabajados]
+        random.shuffle(dias_posibles_libres)
+        for i in range(dias_libres - dias_libres_asignados[empleado]):
+            if dias_posibles_libres:
+                dia_libre = dias_posibles_libres.pop()
+                horario[dia_libre] = [item for item in horario[dia_libre] if item["empleado"] != empleado]
+                dias_libres_asignados[empleado] += 1
+
+    return horario
+
+# Generar horarios flexibles
+horario_camareros_generado = generar_horario_flexible(
+    personal_camareros, turnos_posibles_camareros, cobertura_camareros_horaria, dias_semana, max_horas_semanales, min_descanso_entre_turnos, dias_libres_semana
+)
+
+horario_cocineros_generado = generar_horario_flexible(
+    personal_cocineros, turnos_posibles_cocineros, cobertura_cocineros_horaria, dias_semana, max_horas_semanales, min_descanso_entre_turnos, dias_libres_semana
+)
+
+def imprimir_horario_flexible(horario, tipo_personal):
+    print(f"\n--- Horario Flexible de {tipo_personal} ---")
+    for dia in dias_semana:
+        print(f"\n{dia}:")
+        for asignacion in horario[dia]:
+            print(f"  {asignacion['empleado']}: {asignacion['turno']['nombre']} ({asignacion['turno']['inicio']:02d}-{asignacion['turno']['fin']:02d}h)")
+
+imprimir_horario_flexible(horario_camareros_generado, "Camareros")
+imprimir_horario_flexible(horario_cocineros_generado, "Cocineros")
